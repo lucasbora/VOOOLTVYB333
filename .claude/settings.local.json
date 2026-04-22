@@ -3,7 +3,11 @@
     "allow": [
       "Bash(export PATH=\"/c/Program Files/nodejs:$PATH\")",
       "Bash(npm install:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(npm test *)",
+      "Bash(pandoc --version)",
+      "Bash(node generate-doc.mjs)",
+      "Bash(xargs grep *)"
     ]
   }
 }
