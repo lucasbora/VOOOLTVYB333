@@ -7,7 +7,25 @@
       "Bash(npm test *)",
       "Bash(pandoc --version)",
       "Bash(node generate-doc.mjs)",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(npx tsc *)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(node_modules/.bin/vite build *)",
+      "Bash(node src/server.ts)",
+      "Bash(curl -s http://localhost:3000/api/items)",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const j=JSON.parse\\(d\\); console.log\\('total:',j.total,'page:',j.page,'items returned:',j.data.length\\)\")",
+      "Bash(curl -s http://localhost:3000/api/stats)",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const j=JSON.parse\\(d\\); console.log\\('totalItems:',j.totalItems,'reviews.total:',j.reviews.total\\)\" echo \"\" echo \"--- /api/generator/status ---\" curl -s http://localhost:3000/api/generator/status echo \"\" echo \"--- GraphQL ---\" curl -s -X POST http://localhost:3000/graphql -H \"Content-Type: application/json\" -d \"{\\\\\"query\\\\\":\\\\\"{ stats { totalItems avgPrice } }\\\\\"}\" echo \"\" echo \"--- /api/items/1/reviews ---\" curl -s http://localhost:3000/api/items/1/reviews echo \"\" kill %1)",
+      "Bash(node_modules/.bin/tsx src/server.ts)",
+      "Bash(curl -s http://localhost:3000/api/items?limit=3)",
+      "Bash(node -e \"process.stdin.resume\\(\\);let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\(JSON.stringify\\({totalItems:j.totalItems,reviewsTotal:j.reviews.total,avgPrice:j.avgPrice}\\)\\)}\\)\" echo \"\" echo \"---\" curl -s http://localhost:3000/api/generator/status echo \"\" echo \"---\" curl -s -X POST http://localhost:3000/graphql -H \"Content-Type: application/json\" -d \"{\\\\\"query\\\\\":\\\\\"{ stats { totalItems avgPrice } }\\\\\"}\" echo \"\" echo \"---\" curl -s http://localhost:3000/api/items/1/reviews echo \"\" kill %1)",
+      "Bash(curl -s \"http://localhost:3000/api/items?limit=2\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\('Endpoint: GET /api/items'\\);console.log\\('Total items:',j.total\\);console.log\\('First item:',j.data[0].name,'$'+j.data[0].price\\)}\\)\")",
+      "Bash(curl -s -X POST http://localhost:3000/graphql -H 'Content-Type: application/json' -d '{\"query\":\"{ items\\(limit:2\\){ data{ name price } total } }\"}')",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\('Endpoint: POST /graphql'\\);console.log\\('Total items:',j.data.items.total\\);console.log\\('First item:',j.data.items.data[0].name,'$'+j.data.items.data[0].price\\)}\\)\" kill %1)",
+      "Bash(curl.exe -s -X POST http://localhost:3000/graphql -H \"Content-Type: application/json\" -d \"{\\\\\"query\\\\\":\\\\\"{ items\\(limit:2\\){ data{ id name } total } }\\\\\"}\")",
+      "Bash(curl.exe -s -X POST http://localhost:3000/graphql -H \"Content-Type: application/json\" -d \"{\\\\\"query\\\\\":\\\\\"mutation { deleteItem\\(id: \\\\\\\\\\\\\"1\\\\\\\\\\\\\"\\) }\\\\\"}\")",
+      "Bash(kill %1)"
     ]
   }
 }

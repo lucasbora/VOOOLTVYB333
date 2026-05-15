@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Item {
+  id          String      @id @default(cuid())
+  name        String
+  category    String
+  price       Float
+  colorHex    String
+  colorName   String
+  colorGroup  String
+  styleTags   String
+  rating      Float
+  description String
+  material    String
+  sizes       String
+  inStock     Boolean
+  imageUrl    String
+  featured    Boolean
+  stock       Int
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  reviews     Review[]
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  itemId    String
+  author    String
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+}
+
+model User {
+  id            String          @id @default(cuid())
+  email         String          @unique
+  username      String
+  password      String
+  roleId        String
+  role          Role            @relation(fields: [roleId], references: [id])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  activityLogs  ActivityLog[]
+  watchlistItem WatchlistUser[]
+
+  @@index([roleId])
+}
+
+model Role {
+  id          String               @id @default(cuid())
+  code        String               @unique
+  name        String
+  users       User[]
+  permissions RolePermissionLink[]
+}
+
+model Permission {
+  id    String               @id @default(cuid())
+  code  String               @unique
+  name  String
+  roles RolePermissionLink[]
+}
+
+model RolePermissionLink {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model ActivityLog {
+  id              String   @id @default(cuid())
+  userId          String
+  roleCode        String
+  action          String
+  actionInfo      String
+  createdAt       DateTime @default(now())
+  suspiciousScore Int      @default(0)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([suspiciousScore])
+}
+
+model WatchlistUser {
+  userId        String   @id
+  reason        String
+  addedAt       DateTime @default(now())
+  status        String
+  riskScore     Int
+  flaggedByRule String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

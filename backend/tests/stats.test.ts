@@ -21,8 +21,8 @@ const newItem = {
   stock: 5,
 };
 
-beforeEach(() => {
-  store.reset();
+beforeEach(async () => {
+  await store.reset();
 });
 
 describe('GET /api/stats', () => {
@@ -132,7 +132,7 @@ describe('GET /api/stats', () => {
   });
 
   it('returns zero values for an empty store', async () => {
-    store.clear();
+    await store.clear();
     const res = await request(app).get('/api/stats');
     expect(res.status).toBe(200);
     expect(res.body.totalItems).toBe(0);
