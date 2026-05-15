@@ -21,18 +21,13 @@ export function Chat() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Load history via REST on room change
-  useEffect(() => {
-    if (!user) return;
-    apiClient.getChatHistory(roomId)
-      .then(setMessages)
-      .catch(() => setMessages([]));
-  }, [roomId, user]);
+  // Chat history is automatically loaded via WebSocket on connection.
 
   // WebSocket connection
   useEffect(() => {
     if (!user) return;
 
+    setMessages([]);
     const connect = () => {
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const ws = new WebSocket(
