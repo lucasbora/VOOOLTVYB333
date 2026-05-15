@@ -27,22 +27,36 @@ export function Chat() {
   useEffect(() => {
     if (!user) return;
 
+    let isCancelled = false;
     setMessages([]);
+
     const connect = () => {
+      if (isCancelled) return;
+
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const ws = new WebSocket(
         `${proto}//${window.location.host}/ws/chat?roomId=${encodeURIComponent(roomId)}&userId=${encodeURIComponent(user.id)}`
       );
       wsRef.current = ws;
 
-      ws.onopen = () => setConnected(true);
+      ws.onopen = () => {
+        if (isCancelled) {
+          ws.close();
+          return;
+        }
+        setConnected(true);
+      };
+
       ws.onclose = () => {
+        if (isCancelled) return;
         setConnected(false);
         setTimeout(connect, 3000);
       };
+
       ws.onerror = () => ws.close();
 
       ws.onmessage = (e) => {
+        if (isCancelled) return;
         try {
           const msg = JSON.parse(e.data);
           if (msg.type === 'CHAT_HISTORY') {
@@ -58,7 +72,10 @@ export function Chat() {
     };
 
     connect();
-    return () => wsRef.current?.close();
+    return () => {
+      isCancelled = true;
+      wsRef.current?.close();
+    };
   }, [roomId, user?.id]);
 
   // Scroll to bottom on new messages
