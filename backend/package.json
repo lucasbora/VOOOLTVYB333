@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "VOLT VYBE REST API — in-memory backend",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --ignore \"**/*.db\" --ignore \"**/*.db-journal\" src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc",
     "prisma:generate": "prisma generate",
