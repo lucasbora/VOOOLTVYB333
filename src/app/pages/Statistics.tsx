@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
+import { apiClient } from '../api/apiClient';
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, Legend
+  ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis,
 } from 'recharts';
-import { BarChart3, Grid, Star, TrendingUp, Info } from 'lucide-react';
+import { BarChart3, Grid, Star, TrendingUp, Info, Play, Square, MessageSquare } from 'lucide-react';
 
 const YELLOW = '#FFE500';
 const CYAN = '#00E5FF';
@@ -18,6 +19,34 @@ export function Statistics() {
   const { items } = useApp();
   const [view, setView] = useState<ViewMode>('visual');
   const [showPrinciple, setShowPrinciple] = useState(false);
+
+  // ── Generator controls (Silver Task 2) ──────────────────────────────────
+  const [generatorRunning, setGeneratorRunning] = useState(false);
+
+  useEffect(() => {
+    apiClient.getGeneratorStatus().then(s => setGeneratorRunning(s.running)).catch(() => {});
+  }, []);
+
+  const toggleGenerator = async () => {
+    try {
+      if (generatorRunning) {
+        await apiClient.stopGenerator();
+        setGeneratorRunning(false);
+      } else {
+        await apiClient.startGenerator();
+        setGeneratorRunning(true);
+      }
+    } catch { /* backend not running */ }
+  };
+
+  // ── Review stats (Gold Task 3) ───────────────────────────────────────────
+  const [reviewStats, setReviewStats] = useState<{ total: number; avgRating: number; topReviewedItems: { id: string; name: string; reviewCount: number }[] } | null>(null);
+
+  useEffect(() => {
+    apiClient.getStats().then((s: any) => {
+      if (s.reviews) setReviewStats(s.reviews);
+    }).catch(() => {});
+  }, [items.length]);
 
   // Category breakdown
   const categoryData = Object.entries(
@@ -350,6 +379,74 @@ export function Statistics() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Generator controls (Silver Task 2) */}
+      <div className="mt-10 p-6 rounded" style={{ background: '#111111', border: '1px solid rgba(255,229,0,0.12)' }}>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', letterSpacing: '0.3em', marginBottom: '4px' }}>LIVE DATA</div>
+            <h3 style={{ color: '#FFFFFF', fontFamily: "'Orbitron', sans-serif", fontSize: '14px', fontWeight: 700 }}>
+              FAKE ITEM GENERATOR
+            </h3>
+            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '12px', marginTop: '4px' }}>
+              Auto-generates a new item every 3 seconds via WebSocket · {items.length} items total
+            </p>
+          </div>
+          <motion.button onClick={toggleGenerator} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 px-6 py-3 rounded"
+            style={{
+              background: generatorRunning ? 'rgba(255,68,68,0.15)' : '#FFE500',
+              color: generatorRunning ? '#FF4444' : '#0A0A0A',
+              border: generatorRunning ? '1px solid rgba(255,68,68,0.4)' : 'none',
+              fontFamily: "'Orbitron', sans-serif", fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em',
+            }}>
+            {generatorRunning ? <><Square size={13} /> STOP GENERATOR</> : <><Play size={13} /> START GENERATOR</>}
+          </motion.button>
+        </div>
+        {generatorRunning && (
+          <div className="mt-4 flex items-center gap-2">
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#00E5FF', display: 'inline-block', animation: 'pulse 1s infinite' }} />
+            <span style={{ color: '#00E5FF', fontSize: '11px', letterSpacing: '0.15em' }}>GENERATING — new items appear in real-time</span>
+          </div>
+        )}
+      </div>
+
+      {/* Review stats (Gold Task 3 — 1-to-many) */}
+      {reviewStats && (
+        <div className="mt-6 p-6 rounded" style={{ background: '#111111', border: '1px solid rgba(255,229,0,0.12)' }}>
+          <div className="flex items-center gap-3 mb-6">
+            <MessageSquare size={16} style={{ color: YELLOW }} />
+            <h3 style={{ color: '#FFFFFF', fontFamily: "'Orbitron', sans-serif", fontSize: '16px', fontWeight: 700 }}>REVIEWS ANALYTICS</h3>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {[
+              { label: 'TOTAL REVIEWS', value: reviewStats.total, color: YELLOW },
+              { label: 'AVG REVIEW RATING', value: reviewStats.avgRating > 0 ? `${reviewStats.avgRating.toFixed(1)} ★` : '—', color: CYAN },
+              { label: 'REVIEWED ITEMS', value: reviewStats.topReviewedItems.length, color: '#A855F7' },
+            ].map(s => (
+              <div key={s.label} className="p-4 rounded" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${s.color}20` }}>
+                <div style={{ color: s.color, fontFamily: "'Orbitron', sans-serif", fontSize: '28px', fontWeight: 700 }}>{s.value}</div>
+                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', letterSpacing: '0.2em', marginTop: '4px' }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+          {reviewStats.topReviewedItems.length > 0 && (
+            <div>
+              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', letterSpacing: '0.2em', marginBottom: '12px' }}>MOST REVIEWED</div>
+              <div className="space-y-2">
+                {reviewStats.topReviewedItems.map((item, i) => (
+                  <div key={item.id} className="flex items-center gap-3 p-3 rounded"
+                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span style={{ color: i === 0 ? YELLOW : 'rgba(255,255,255,0.3)', fontFamily: "'Orbitron', sans-serif", fontSize: '13px', fontWeight: 700, width: 24 }}>#{i + 1}</span>
+                    <span style={{ color: '#FFFFFF', fontSize: '13px', flex: 1 }}>{item.name}</span>
+                    <span style={{ color: CYAN, fontFamily: "'Orbitron', sans-serif", fontSize: '13px', fontWeight: 700 }}>{item.reviewCount} reviews</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

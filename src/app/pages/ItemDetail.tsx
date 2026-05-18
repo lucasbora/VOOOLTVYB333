@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
-import { Star, ArrowLeft, Edit3, Trash2, Check, X, Package, Zap } from 'lucide-react';
+import { apiClient, Review } from '../api/apiClient';
+import { Star, ArrowLeft, Edit3, Trash2, Check, X, Package, Zap, MessageSquare, Send } from 'lucide-react';
 
 export function ItemDetail() {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +14,49 @@ export function ItemDetail() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(item ? { ...item } : null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // ── Reviews state ────────────────────────────────────────────────────────
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewForm, setReviewForm] = useState({ author: '', rating: 5, comment: '' });
+  const [reviewErrors, setReviewErrors] = useState<{ author?: string; comment?: string; rating?: string }>({});
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  useEffect(() => {
+    if (item) {
+      apiClient.getReviews(item.id).then(setReviews).catch(() => setReviews([]));
+    }
+  }, [item?.id]);
+
+  const validateReview = () => {
+    const e: typeof reviewErrors = {};
+    if (!reviewForm.author.trim()) e.author = 'Name is required.';
+    if (!reviewForm.comment.trim()) e.comment = 'Comment is required.';
+    else if (reviewForm.comment.length > 500) e.comment = 'Max 500 characters.';
+    if (reviewForm.rating < 1 || reviewForm.rating > 5) e.rating = 'Rating must be 1–5.';
+    return e;
+  };
+
+  const handleAddReview = async () => {
+    const errors = validateReview();
+    setReviewErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    setSubmittingReview(true);
+    try {
+      const created = await apiClient.createReview(item!.id, reviewForm);
+      setReviews(prev => [created, ...prev]);
+      setReviewForm({ author: '', rating: 5, comment: '' });
+    } catch { /* server-side error — silently ignore for now */ }
+    finally { setSubmittingReview(false); }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    await apiClient.deleteReview(item!.id, reviewId).catch(() => {});
+    setReviews(prev => prev.filter(r => r.id !== reviewId));
+  };
+
+  const avgReviewRating = reviews.length > 0
+    ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
+    : null;
 
   if (!item || !form) {
     return (
@@ -223,6 +267,89 @@ export function ItemDetail() {
             </div>
           )}
         </motion.div>
+      </div>
+
+      {/* Reviews (Gold Task 3 — 1-to-many) */}
+      <div className="px-6 lg:px-10 py-10 border-t" style={{ borderColor: 'rgba(255,229,0,0.1)' }}>
+        <div className="flex items-center gap-3 mb-6">
+          <MessageSquare size={16} style={{ color: '#FFE500' }} />
+          <h3 style={{ color: '#FFFFFF', fontFamily: "'Orbitron', sans-serif", fontSize: '16px', fontWeight: 700 }}>
+            REVIEWS
+          </h3>
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>
+            ({reviews.length}{avgReviewRating !== null ? ` · avg ${avgReviewRating.toFixed(1)}★` : ''})
+          </span>
+        </div>
+
+        {/* Add review form */}
+        <div className="mb-8 p-5 rounded" style={{ background: '#111111', border: '1px solid rgba(255,229,0,0.12)' }}>
+          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', letterSpacing: '0.2em', marginBottom: '12px' }}>LEAVE A REVIEW</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+              <input value={reviewForm.author} onChange={e => setReviewForm(p => ({ ...p, author: e.target.value }))}
+                placeholder="Your name"
+                className="w-full px-3 py-2 rounded outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${reviewErrors.author ? '#FF4444' : 'rgba(255,229,0,0.15)'}`, color: '#FFFFFF', fontSize: '13px' }} />
+              {reviewErrors.author && <p style={{ color: '#FF4444', fontSize: '10px', marginTop: '2px' }}>{reviewErrors.author}</p>}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button key={n} onClick={() => setReviewForm(p => ({ ...p, rating: n }))} type="button">
+                    <Star size={20} fill={n <= reviewForm.rating ? '#FFE500' : 'transparent'} color="#FFE500" />
+                  </button>
+                ))}
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>{reviewForm.rating}/5</span>
+              </div>
+              {reviewErrors.rating && <p style={{ color: '#FF4444', fontSize: '10px', marginTop: '2px' }}>{reviewErrors.rating}</p>}
+            </div>
+          </div>
+          <textarea value={reviewForm.comment} onChange={e => setReviewForm(p => ({ ...p, comment: e.target.value }))}
+            placeholder="Share your thoughts..." rows={3}
+            className="w-full px-3 py-2 rounded outline-none resize-none mb-3"
+            style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${reviewErrors.comment ? '#FF4444' : 'rgba(255,229,0,0.15)'}`, color: '#FFFFFF', fontSize: '13px' }} />
+          {reviewErrors.comment && <p style={{ color: '#FF4444', fontSize: '10px', marginBottom: '8px' }}>{reviewErrors.comment}</p>}
+          <motion.button onClick={handleAddReview} disabled={submittingReview}
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            className="flex items-center gap-2 px-5 py-2 rounded"
+            style={{ background: '#FFE500', color: '#0A0A0A', fontFamily: "'Orbitron', sans-serif", fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', opacity: submittingReview ? 0.6 : 1 }}>
+            <Send size={13} /> {submittingReview ? 'POSTING...' : 'POST REVIEW'}
+          </motion.button>
+        </div>
+
+        {/* Reviews list */}
+        <div className="space-y-4">
+          <AnimatePresence>
+            {reviews.length === 0 ? (
+              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>No reviews yet — be the first!</p>
+            ) : reviews.map(review => (
+              <motion.div key={review.id}
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+                className="p-4 rounded"
+                style={{ background: '#111111', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span style={{ color: '#FFFFFF', fontWeight: 600, fontSize: '13px' }}>{review.author}</span>
+                    <div className="flex items-center gap-1 mt-1">
+                      {[1, 2, 3, 4, 5].map(n => (
+                        <Star key={n} size={11} fill={n <= review.rating ? '#FFE500' : 'transparent'} color="#FFE500" />
+                      ))}
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', marginLeft: '4px' }}>
+                        {new Date(review.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                  <button onClick={() => handleDeleteReview(review.id)}
+                    className="p-1 rounded hover:bg-red-500/10 transition-colors"
+                    style={{ color: 'rgba(255,100,100,0.5)' }}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+                <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '13px', lineHeight: 1.6, marginTop: '8px' }}>{review.comment}</p>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Related items */}

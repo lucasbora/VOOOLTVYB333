@@ -6,6 +6,8 @@ import { Catalog } from './pages/Catalog';
 import { ItemDetail } from './pages/ItemDetail';
 import { Statistics } from './pages/Statistics';
 import { StyleMatcher } from './pages/StyleMatcher';
+import { Chat } from './pages/Chat';
+import { AdminPanel } from './pages/AdminPanel';
 
 export const router = createBrowserRouter([
   {
@@ -39,6 +41,14 @@ export const router = createBrowserRouter([
       {
         path: 'style-matcher',
         Component: StyleMatcher,
+      },
+      {
+        path: 'chat',
+        Component: Chat,
+      },
+      {
+        path: 'admin',
+        Component: AdminPanel,
       },
     ],
   },

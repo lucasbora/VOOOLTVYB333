@@ -21,7 +21,7 @@ export function AuthPage() {
 
   const validateEmail = (addr: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -30,13 +30,13 @@ export function AuthPage() {
     if (!password) { setError('Password is required.'); return; }
 
     if (mode === 'login') {
-      const ok = login(email, password);
+      const ok = await login(email, password);
       if (ok) navigate('/home');
       else setError('Invalid credentials. Try demo@voltvybe.com / demo1234');
     } else {
       if (!username.trim()) { setError('Username is required.'); return; }
       if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
-      const ok = register(email, username, password);
+      const ok = await register(email, username, password);
       if (ok) navigate('/home');
       else setError('Email already registered.');
     }

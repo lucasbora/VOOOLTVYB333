@@ -1,0 +1,192 @@
+import { ClothingItem } from '../data/items';
+
+const BASE = '/api';
+let authUserId: string | null = null;
+
+try {
+  authUserId = localStorage.getItem('volt_vybe_user_id');
+} catch {
+  authUserId = null;
+}
+
+export interface PaginatedResponse {
+  data: ClothingItem[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const headers = new Headers(options?.headers ?? {});
+  if (authUserId) headers.set('x-user-id', authUserId);
+
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 204) return undefined as T;
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw Object.assign(new Error(body.error ?? `HTTP ${res.status}`), { status: res.status, body });
+  }
+  return res.json();
+}
+
+export const apiClient = {
+  setAuthUser(userId: string | null): void {
+    authUserId = userId;
+    if (userId) localStorage.setItem('volt_vybe_user_id', userId);
+    else localStorage.removeItem('volt_vybe_user_id');
+  },
+
+  getItems(params?: { page?: number; limit?: number; category?: string; inStock?: boolean; colorGroup?: string }): Promise<PaginatedResponse> {
+    const q = new URLSearchParams();
+    if (params?.page)       q.set('page',       String(params.page));
+    if (params?.limit)      q.set('limit',      String(params.limit));
+    if (params?.category)   q.set('category',   params.category);
+    if (params?.colorGroup) q.set('colorGroup', params.colorGroup);
+    if (params?.inStock !== undefined) q.set('inStock', String(params.inStock));
+    return request<PaginatedResponse>(`${BASE}/items?${q}`);
+  },
+
+  getItem(id: string): Promise<ClothingItem> {
+    return request<ClothingItem>(`${BASE}/items/${id}`);
+  },
+
+  createItem(data: Omit<ClothingItem, 'id'>): Promise<ClothingItem> {
+    return request<ClothingItem>(`${BASE}/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateItem(id: string, data: Partial<Omit<ClothingItem, 'id'>>): Promise<ClothingItem> {
+    return request<ClothingItem>(`${BASE}/items/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteItem(id: string): Promise<void> {
+    return request<void>(`${BASE}/items/${id}`, { method: 'DELETE' });
+  },
+
+  getStats(): Promise<Record<string, unknown>> {
+    return request<Record<string, unknown>>(`${BASE}/stats`);
+  },
+
+  startGenerator(): Promise<{ status: string }> {
+    return request<{ status: string }>(`${BASE}/generator/start`, { method: 'POST' });
+  },
+
+  stopGenerator(): Promise<{ status: string }> {
+    return request<{ status: string }>(`${BASE}/generator/stop`, { method: 'POST' });
+  },
+
+  getGeneratorStatus(): Promise<{ running: boolean }> {
+    return request<{ running: boolean }>(`${BASE}/generator/status`);
+  },
+
+  register(data: { email: string; username: string; password: string; roleCode?: 'ADMIN' | 'USER' }): Promise<SessionUser> {
+    return request<SessionUser>(`${BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  login(data: { email: string; password: string }): Promise<SessionUser> {
+    return request<SessionUser>(`${BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  getObservationList(): Promise<ObservationEntry[]> {
+    return request<ObservationEntry[]>(`${BASE}/admin/observation-list`);
+  },
+
+  getAuditLogs(): Promise<AuditLogEntry[]> {
+    return request<AuditLogEntry[]>(`${BASE}/admin/logs`);
+  },
+
+  getChatHistory(roomId: string): Promise<ChatMessage[]> {
+    return request<ChatMessage[]>(`${BASE}/chat/${encodeURIComponent(roomId)}/messages`);
+  },
+
+  createChatMessage(data: { roomId: string; text: string }): Promise<ChatMessage> {
+    return request<ChatMessage>(`${BASE}/chat/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  getReviews(itemId: string): Promise<Review[]> {
+    return request<Review[]>(`${BASE}/items/${itemId}/reviews`);
+  },
+
+  createReview(itemId: string, data: { author: string; rating: number; comment: string }): Promise<Review> {
+    return request<Review>(`${BASE}/items/${itemId}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteReview(itemId: string, reviewId: string): Promise<void> {
+    return request<void>(`${BASE}/items/${itemId}/reviews/${reviewId}`, { method: 'DELETE' });
+  },
+};
+
+export interface Review {
+  id: string;
+  itemId: string;
+  author: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+export interface SessionUser {
+  id: string;
+  email: string;
+  username: string;
+  roleCode: 'ADMIN' | 'USER';
+  permissions: string[];
+}
+
+export interface ChatMessage {
+  _id?: string;
+  roomId: string;
+  userId: string;
+  username: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface ObservationEntry {
+  userId: string;
+  email: string;
+  username: string;
+  reason: string;
+  status: string;
+  riskScore: number;
+  flaggedByRule: string;
+  addedAt: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  userId: string;
+  roleCode: string;
+  action: string;
+  actionInfo: string;
+  createdAt: string;
+  suspiciousScore: number;
+  user: {
+    email: string;
+    username: string;
+  };
+}

@@ -21,8 +21,8 @@ const validItem = {
   stock: 10,
 };
 
-beforeEach(() => {
-  store.reset();
+beforeEach(async () => {
+  await store.reset();
 });
 
 // ---------------------------------------------------------------------------
