@@ -4,6 +4,36 @@ import { renderHook, act } from '@testing-library/react';
 import { AppProvider, useApp } from '../app/context/AppContext';
 import { initialItems } from '../app/data/items';
 
+// ─── apiClient mock ───────────────────────────────────────────────────────────
+vi.mock('../app/api/apiClient', () => {
+  const users = new Map();
+  users.set('demo@voltvybe.com', { id: 'demo', email: 'demo@voltvybe.com', username: 'DEMO', password: 'demo1234', roleCode: 'USER' });
+
+  return {
+    apiClient: {
+      setToken: vi.fn(),
+      logout: vi.fn(async () => {}),
+      getItems: vi.fn(async () => ({ data: [], totalPages: 1 })),
+      getGeneratorStatus: vi.fn(async () => {}),
+      login: vi.fn(async ({ email, password }) => {
+        const u = users.get(email);
+        if (u && u.password === password) {
+          const { password: _p, ...userData } = u;
+          return { token: 'mock-token', user: userData };
+        }
+        throw new Error('Invalid credentials');
+      }),
+      register: vi.fn(async ({ email, username, password }) => {
+        if (users.has(email)) throw new Error('Email already registered');
+        const newUser = { id: Date.now().toString(), email, username, password, roleCode: 'USER' };
+        users.set(email, newUser);
+        const { password: _p, ...userData } = newUser;
+        return { token: 'mock-token', user: userData };
+      })
+    }
+  };
+});
+
 // ─── localStorage mock ────────────────────────────────────────────────────────
 const createStoreMock = () => {
   let store: Record<string, string> = {};
@@ -239,39 +269,39 @@ describe('AppContext', () => {
 
   // ── register ─────────────────────────────────────────────────────────────────
   describe('register', () => {
-    it('returns true and authenticates for a new email', () => {
+    it('returns true and authenticates for a new email', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
       let ok: boolean | undefined;
 
-      act(() => { ok = result.current.register('new@user.com', 'NEWUSER', 'password123'); });
+      await act(async () => { ok = await result.current.register('new@user.com', 'NEWUSER', 'password123'); });
 
       expect(ok).toBe(true);
       expect(result.current.isAuthenticated).toBe(true);
     });
 
-    it('sets user email and username on successful register', () => {
+    it('sets user email and username on successful register', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
 
-      act(() => { result.current.register('volt@test.com', 'VOLTFAN', 'abc123abc'); });
+      await act(async () => { await result.current.register('volt@test.com', 'VOLTFAN', 'abc123abc'); });
 
       expect(result.current.user?.email).toBe('volt@test.com');
       expect(result.current.user?.username).toBe('VOLTFAN');
     });
 
-    it('returns false when email is already registered', () => {
+    it('returns false when email is already registered', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
       let ok2: boolean | undefined;
 
-      act(() => { result.current.register('dup@user.com', 'USER1', 'password123'); });
-      act(() => { ok2 = result.current.register('dup@user.com', 'USER2', 'password456'); });
+      await act(async () => { await result.current.register('dup@user.com', 'USER1', 'password123'); });
+      await act(async () => { ok2 = await result.current.register('dup@user.com', 'USER2', 'password456'); });
 
       expect(ok2).toBe(false);
     });
 
-    it('persists user to localStorage on successful register', () => {
+    it('persists user to localStorage on successful register', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
 
-      act(() => { result.current.register('persist@test.com', 'PERSISTED', 'testpass1'); });
+      await act(async () => { await result.current.register('persist@test.com', 'PERSISTED', 'testpass1'); });
 
       const stored = localStorageMock.getItem('volt_vybe_user');
       expect(stored).not.toBeNull();
@@ -282,56 +312,56 @@ describe('AppContext', () => {
 
   // ── login ────────────────────────────────────────────────────────────────────
   describe('login', () => {
-    it('authenticates with built-in demo credentials', () => {
+    it('authenticates with built-in demo credentials', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
       let ok: boolean | undefined;
 
-      act(() => { ok = result.current.login('demo@voltvybe.com', 'demo1234'); });
+      await act(async () => { ok = await result.current.login('demo@voltvybe.com', 'demo1234'); });
 
       expect(ok).toBe(true);
       expect(result.current.isAuthenticated).toBe(true);
       expect(result.current.user?.email).toBe('demo@voltvybe.com');
     });
 
-    it('returns false and stays unauthenticated for wrong credentials', () => {
+    it('returns false and stays unauthenticated for wrong credentials', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
       let ok: boolean | undefined;
 
-      act(() => { ok = result.current.login('wrong@email.com', 'wrongpass'); });
+      await act(async () => { ok = await result.current.login('wrong@email.com', 'wrongpass'); });
 
       expect(ok).toBe(false);
       expect(result.current.isAuthenticated).toBe(false);
     });
 
-    it('can log in a previously registered user', () => {
+    it('can log in a previously registered user', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
 
-      act(() => { result.current.register('reg@login.com', 'REGUSER', 'mypassword1'); });
+      await act(async () => { await result.current.register('reg@login.com', 'REGUSER', 'mypassword1'); });
       act(() => { result.current.logout(); });
 
       let ok: boolean | undefined;
-      act(() => { ok = result.current.login('reg@login.com', 'mypassword1'); });
+      await act(async () => { ok = await result.current.login('reg@login.com', 'mypassword1'); });
 
       expect(ok).toBe(true);
       expect(result.current.user?.username).toBe('REGUSER');
     });
 
-    it('fails login with the correct email but wrong password', () => {
+    it('fails login with the correct email but wrong password', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
 
-      act(() => { result.current.register('pass@check.com', 'PASSUSER', 'correctpass'); });
+      await act(async () => { await result.current.register('pass@check.com', 'PASSUSER', 'correctpass'); });
       act(() => { result.current.logout(); });
 
       let ok: boolean | undefined;
-      act(() => { ok = result.current.login('pass@check.com', 'wrongpass'); });
+      await act(async () => { ok = await result.current.login('pass@check.com', 'wrongpass'); });
 
       expect(ok).toBe(false);
     });
 
-    it('sets isAuthenticated to true after successful login', () => {
+    it('sets isAuthenticated to true after successful login', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
 
-      act(() => { result.current.login('demo@voltvybe.com', 'demo1234'); });
+      await act(async () => { await result.current.login('demo@voltvybe.com', 'demo1234'); });
 
       expect(result.current.isAuthenticated).toBe(true);
     });
@@ -339,10 +369,10 @@ describe('AppContext', () => {
 
   // ── logout ───────────────────────────────────────────────────────────────────
   describe('logout', () => {
-    it('sets isAuthenticated to false', () => {
+    it('sets isAuthenticated to false', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
 
-      act(() => { result.current.login('demo@voltvybe.com', 'demo1234'); });
+      await act(async () => { await result.current.login('demo@voltvybe.com', 'demo1234'); });
       expect(result.current.isAuthenticated).toBe(true);
 
       act(() => { result.current.logout(); });
@@ -350,29 +380,29 @@ describe('AppContext', () => {
       expect(result.current.isAuthenticated).toBe(false);
     });
 
-    it('clears the user object', () => {
+    it('clears the user object', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
 
-      act(() => { result.current.login('demo@voltvybe.com', 'demo1234'); });
+      await act(async () => { await result.current.login('demo@voltvybe.com', 'demo1234'); });
       act(() => { result.current.logout(); });
 
       expect(result.current.user).toBeNull();
     });
 
-    it('removes user from localStorage', () => {
+    it('removes user from localStorage', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
 
-      act(() => { result.current.login('demo@voltvybe.com', 'demo1234'); });
+      await act(async () => { await result.current.login('demo@voltvybe.com', 'demo1234'); });
       act(() => { result.current.logout(); });
 
       expect(localStorageMock.getItem('volt_vybe_user')).toBeNull();
     });
 
-    it('does not affect items list', () => {
+    it('does not affect items list', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
       const itemCount = result.current.items.length;
 
-      act(() => { result.current.login('demo@voltvybe.com', 'demo1234'); });
+      await act(async () => { await result.current.login('demo@voltvybe.com', 'demo1234'); });
       act(() => { result.current.logout(); });
 
       expect(result.current.items).toHaveLength(itemCount);

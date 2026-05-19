@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { ClothingItem, initialItems } from '../data/items';
 import { apiClient, SessionUser } from '../api/apiClient';
 
-interface User extends SessionUser {}
+interface User extends SessionUser { }
 
 export interface Activity {
   id: string;
@@ -35,7 +35,7 @@ const AppContext = createContext<AppContextType | null>(null);
 
 const STORAGE_KEYS = {
   USER: 'volt_vybe_user',
-  USERS: 'volt_vybe_users',
+  TOKEN: 'volt_vybe_token',
   ACTIVITIES: 'volt_vybe_activities',
   ITEMS_CACHE: 'volt_vybe_items_cache',
   ITEMS_CACHE_LEGACY: 'volt_vybe_items',
@@ -43,6 +43,7 @@ const STORAGE_KEYS = {
 };
 
 const MAX_ACTIVITIES = 20;
+const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes → auto-logout
 
 function isRetryableSyncError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return true;
@@ -65,25 +66,21 @@ function enqueue(op: QueuedOp) {
     saveQueue([...queue, op]);
     return;
   }
-
   const filtered = queue.filter((q) => {
     if (q.type === 'create') return true;
     return q.itemId !== op.itemId;
   });
-
   saveQueue([...filtered, op]);
 }
 function clearQueue() {
   localStorage.removeItem(STORAGE_KEYS.OFFLINE_QUEUE);
 }
-
 function dropQueuedOpsForItem(itemId: string) {
   const queue = getQueue();
   const filtered = queue.filter((op) => {
     if (op.type === 'create') return op.id !== itemId;
     return op.itemId !== itemId;
   });
-
   if (filtered.length === 0) clearQueue();
   else saveQueue(filtered);
 }
@@ -103,9 +100,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     catch { return null; }
   });
 
+  // Sync stored JWT token into apiClient on mount
   useEffect(() => {
-    apiClient.setAuthUser(user?.id ?? null);
-  }, [user?.id]);
+    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+    apiClient.setToken(token);
+  }, []);
 
   const [activities, setActivities] = useState<Activity[]>(() => {
     try { const s = localStorage.getItem(STORAGE_KEYS.ACTIVITIES); return s ? JSON.parse(s) : []; }
@@ -115,8 +114,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const wsRef = useRef<WebSocket | null>(null);
   const backendReachableRef = useRef(true);
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ─── Persist items cache ────────────────────────────────────────────────────
+  // ─── Persist items cache ──────────────────────────────────────────────────
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.ITEMS_CACHE, JSON.stringify(items));
   }, [items]);
@@ -125,7 +125,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activities));
   }, [activities]);
 
-  // ─── Load items from backend on mount ──────────────────────────────────────
+  // ─── Auth helpers ─────────────────────────────────────────────────────────
+  const logActivity = (type: Activity['type'], label: string) => {
+    setActivities(prev => [
+      { id: Date.now().toString(), type, label, timestamp: Date.now() },
+      ...prev,
+    ].slice(0, MAX_ACTIVITIES));
+  };
+
+  const doLogout = useCallback(() => {
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    // Best-effort server-side log (fire-and-forget)
+    apiClient.logout().catch(() => { });
+    apiClient.setToken(null);
+    localStorage.removeItem(STORAGE_KEYS.USER);
+    localStorage.removeItem(STORAGE_KEYS.TOKEN);
+    setUser(null);
+  }, []);
+
+  // ─── Inactivity timer ─────────────────────────────────────────────────────
+  const resetInactivityTimer = useCallback(() => {
+    if (!user) return; // only track while logged in
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    inactivityTimerRef.current = setTimeout(() => {
+      logActivity('logout', 'Session expired due to inactivity');
+      doLogout();
+    }, INACTIVITY_TIMEOUT);
+  }, [user, doLogout]);
+
+  useEffect(() => {
+    if (!user) {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      return;
+    }
+
+    const events = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
+    const handler = () => resetInactivityTimer();
+    events.forEach(e => window.addEventListener(e, handler, { passive: true }));
+    resetInactivityTimer(); // start timer immediately on login
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, handler));
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    };
+  }, [user, resetInactivityTimer]);
+
+  // ─── Load items from backend on mount ────────────────────────────────────
   useEffect(() => {
     loadFromServer();
   }, []);
@@ -147,7 +192,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ─── Offline / online detection ────────────────────────────────────────────
+  // ─── Offline / online detection ───────────────────────────────────────────
   useEffect(() => {
     let lastBackendReachable = false;
     let syncing = false;
@@ -182,7 +227,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const backendReachable = await checkBackendReachability();
       if (backendReachable && !lastBackendReachable) maybeSyncQueue();
       lastBackendReachable = backendReachable;
-
       return browserOnline;
     };
 
@@ -200,9 +244,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     document.addEventListener('visibilitychange', handleVisibility);
-    const intervalId = window.setInterval(() => {
-      checkConnectivity();
-    }, 3000);
+    const intervalId = window.setInterval(() => { checkConnectivity(); }, 3000);
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -238,7 +280,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await loadFromServer();
   };
 
-  // ─── WebSocket — generator live updates ────────────────────────────────────
+  // ─── WebSocket — generator live updates ──────────────────────────────────
   useEffect(() => {
     const connect = () => {
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -259,7 +301,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
 
       ws.onclose = () => {
-        // Reconnect after 3 s if still mounted
         setTimeout(connect, 3000);
       };
     };
@@ -270,19 +311,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // ─── Auth (stays local) ────────────────────────────────────────────────────
-  const logActivity = (type: Activity['type'], label: string) => {
-    setActivities(prev => [
-      { id: Date.now().toString(), type, label, timestamp: Date.now() },
-      ...prev,
-    ].slice(0, MAX_ACTIVITIES));
-  };
-
+  // ─── Public auth actions ──────────────────────────────────────────────────
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const userData = await apiClient.login({ email, password });
-      setUser(userData);
+      const { token, user: userData } = await apiClient.login({ email, password });
+      apiClient.setToken(token);
+      localStorage.setItem(STORAGE_KEYS.TOKEN, token);
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
+      setUser(userData);
       logActivity('login', `${userData.username} logged in`);
       return true;
     } catch {
@@ -293,9 +329,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, username: string, password: string): Promise<boolean> => {
     try {
       const roleCode = email.endsWith('@admin.voltvybe.com') ? 'ADMIN' : 'USER';
-      const userData = await apiClient.register({ email, username, password, roleCode });
-      setUser(userData);
+      const { token, user: userData } = await apiClient.register({ email, username, password, roleCode });
+      apiClient.setToken(token);
+      localStorage.setItem(STORAGE_KEYS.TOKEN, token);
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
+      setUser(userData);
       logActivity('register', `${username} joined VOLT VYBE`);
       return true;
     } catch {
@@ -305,12 +343,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     if (user) logActivity('logout', `${user.username} logged out`);
-    setUser(null);
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    apiClient.setAuthUser(null);
+    doLogout();
   };
 
-  // ─── CRUD — API with offline fallback ──────────────────────────────────────
+  // ─── CRUD — API with offline fallback ────────────────────────────────────
   const addItem = async (data: Omit<ClothingItem, 'id'>) => {
     const normalizedData = { ...data, inStock: data.stock > 0 };
     const tempId = `temp_${Date.now()}`;

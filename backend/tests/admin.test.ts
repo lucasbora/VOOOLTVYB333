@@ -14,7 +14,8 @@ async function createAdminAndGetId(): Promise<string> {
   const res = await request(app).post('/api/auth/register').send({
     email: adminEmail, username: 'GOLD_ADMIN', password, roleCode: 'ADMIN',
   });
-  return res.body.id as string;
+  // Response shape: { token, user: { id, ... } }
+  return (res.body.user?.id ?? res.body.id) as string;
 }
 
 beforeEach(async () => {
@@ -42,7 +43,8 @@ describe('GET /api/admin/logs', () => {
     const userRes = await request(app).post('/api/auth/register').send({
       email: 'plain_user@test.com', username: 'PLAIN', password: 'pass123', roleCode: 'USER',
     });
-    const userId = userRes.body.id;
+    // Response shape: { token, user: { id, ... } }
+    const userId = userRes.body.user?.id ?? userRes.body.id;
     const res = await request(app).get('/api/admin/logs').set('x-user-id', userId);
     expect(res.status).toBe(403);
     await prisma.user.delete({ where: { id: userId } });

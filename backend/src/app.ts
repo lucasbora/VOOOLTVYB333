@@ -1,4 +1,5 @@
 import express, { NextFunction, Request, Response } from 'express';
+import cors from 'cors';
 import { createHandler } from 'graphql-http/lib/use/express';
 import itemsRouter from './routes/items';
 import statsRouter from './routes/stats';
@@ -12,6 +13,16 @@ import { resolvers } from './graphql/resolvers';
 import { attachUser } from './middleware/auth';
 
 const app = express();
+
+// Allow cross-origin requests from any origin (required for LAN cross-machine access).
+// In production, restrict this to specific origins.
+app.use(cors({
+  origin: true,             // reflect the request origin
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id'],
+}));
+app.options('*', cors());  // pre-flight for all routes
 
 app.use(express.json());
 app.use(attachUser);

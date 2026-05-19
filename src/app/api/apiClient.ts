@@ -1,12 +1,14 @@
 import { ClothingItem } from '../data/items';
 
 const BASE = '/api';
-let authUserId: string | null = null;
+
+// ─── Token management ────────────────────────────────────────────────────────
+let authToken: string | null = null;
 
 try {
-  authUserId = localStorage.getItem('volt_vybe_user_id');
+  authToken = localStorage.getItem('volt_vybe_token');
 } catch {
-  authUserId = null;
+  authToken = null;
 }
 
 export interface PaginatedResponse {
@@ -19,7 +21,7 @@ export interface PaginatedResponse {
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers ?? {});
-  if (authUserId) headers.set('x-user-id', authUserId);
+  if (authToken) headers.set('Authorization', `Bearer ${authToken}`);
 
   const res = await fetch(url, { ...options, headers });
   if (res.status === 204) return undefined as T;
@@ -31,10 +33,20 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export const apiClient = {
+  /** Called by AppContext after login/register to set the active JWT */
+  setToken(token: string | null): void {
+    authToken = token;
+    if (token) localStorage.setItem('volt_vybe_token', token);
+    else        localStorage.removeItem('volt_vybe_token');
+  },
+
+  /** @deprecated kept for backwards compatibility — use setToken instead */
   setAuthUser(userId: string | null): void {
-    authUserId = userId;
-    if (userId) localStorage.setItem('volt_vybe_user_id', userId);
-    else localStorage.removeItem('volt_vybe_user_id');
+    // No-op: auth is now handled by JWT, not user ID header.
+    // Kept so AppContext code that calls this doesn't break.
+    if (!userId) {
+      this.setToken(null);
+    }
   },
 
   getItems(params?: { page?: number; limit?: number; category?: string; inStock?: boolean; colorGroup?: string }): Promise<PaginatedResponse> {
@@ -87,20 +99,30 @@ export const apiClient = {
     return request<{ running: boolean }>(`${BASE}/generator/status`);
   },
 
-  register(data: { email: string; username: string; password: string; roleCode?: 'ADMIN' | 'USER' }): Promise<SessionUser> {
-    return request<SessionUser>(`${BASE}/auth/register`, {
+  /** Returns { token, user } */
+  register(data: { email: string; username: string; password: string; roleCode?: 'ADMIN' | 'USER' }): Promise<AuthResponse> {
+    return request<AuthResponse>(`${BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
   },
 
-  login(data: { email: string; password: string }): Promise<SessionUser> {
-    return request<SessionUser>(`${BASE}/auth/login`, {
+  /** Returns { token, user } */
+  login(data: { email: string; password: string }): Promise<AuthResponse> {
+    return request<AuthResponse>(`${BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+  },
+
+  logout(): Promise<void> {
+    return request<void>(`${BASE}/auth/logout`, { method: 'POST' });
+  },
+
+  getMe(): Promise<SessionUser> {
+    return request<SessionUser>(`${BASE}/auth/me`);
   },
 
   getObservationList(): Promise<ObservationEntry[]> {
@@ -139,6 +161,11 @@ export const apiClient = {
     return request<void>(`${BASE}/items/${itemId}/reviews/${reviewId}`, { method: 'DELETE' });
   },
 };
+
+export interface AuthResponse {
+  token: string;
+  user: SessionUser;
+}
 
 export interface Review {
   id: string;

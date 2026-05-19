@@ -11,6 +11,8 @@ export default defineConfig({
     env: {
       DATABASE_URL: 'file:./test.db',
       NODE_ENV: 'test',
+      JWT_SECRET: 'test-only-jwt-secret',
+      JWT_EXPIRES_IN: '1h',
     },
     globalSetup: ['./tests/globalSetup.ts'],
     coverage: {

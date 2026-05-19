@@ -1,5 +1,6 @@
 /**
  * auth.test.ts — Silver: test user registration, login, role-based access.
+ * Updated for JWT response shape: { token, user }
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
@@ -11,28 +12,29 @@ beforeEach(async () => {
   await prisma.activityLog.deleteMany();
   await prisma.watchlistUser.deleteMany();
   await prisma.user.deleteMany({ where: { email: { not: undefined } } });
-  // re-insert only if not already present
 });
 
-const adminEmail   = 'admin_test@admin.voltvybe.com';
-const userEmail    = 'user_test@example.com';
-const password     = 'secret123';
-const username     = 'TEST_USER';
+const adminEmail    = 'admin_test@admin.voltvybe.com';
+const userEmail     = 'user_test@example.com';
+const password      = 'secret123';
+const username      = 'TEST_USER';
 const adminUsername = 'TEST_ADMIN';
 
 // --------------------------------------------------------------------------
 // POST /api/auth/register
 // --------------------------------------------------------------------------
 describe('POST /api/auth/register', () => {
-  it('registers a USER role user', async () => {
+  it('registers a USER role user and returns token + user', async () => {
     const res = await request(app).post('/api/auth/register').send({
       email: userEmail, username, password, roleCode: 'USER',
     });
     expect(res.status).toBe(201);
-    expect(res.body).toHaveProperty('id');
-    expect(res.body.email).toBe(userEmail);
-    expect(res.body.roleCode).toBe('USER');
-    expect(Array.isArray(res.body.permissions)).toBe(true);
+    expect(res.body).toHaveProperty('token');
+    expect(typeof res.body.token).toBe('string');
+    expect(res.body.user).toHaveProperty('id');
+    expect(res.body.user.email).toBe(userEmail);
+    expect(res.body.user.roleCode).toBe('USER');
+    expect(Array.isArray(res.body.user.permissions)).toBe(true);
   });
 
   it('registers an ADMIN role user', async () => {
@@ -40,9 +42,10 @@ describe('POST /api/auth/register', () => {
       email: adminEmail, username: adminUsername, password, roleCode: 'ADMIN',
     });
     expect(res.status).toBe(201);
-    expect(res.body.roleCode).toBe('ADMIN');
-    expect(res.body.permissions).toContain('ITEM_DELETE');
-    expect(res.body.permissions).toContain('LOG_VIEW');
+    expect(res.body.user.roleCode).toBe('ADMIN');
+    expect(res.body.user.permissions).toContain('ITEM_DELETE');
+    expect(res.body.user.permissions).toContain('LOG_VIEW');
+    expect(res.body).toHaveProperty('token');
   });
 
   it('rejects duplicate email with 409', async () => {
@@ -89,14 +92,16 @@ describe('POST /api/auth/login', () => {
     });
   });
 
-  it('logs in with correct credentials', async () => {
+  it('logs in with correct credentials and returns token + user', async () => {
     const res = await request(app).post('/api/auth/login').send({
       email: userEmail, password,
     });
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('id');
-    expect(res.body.email).toBe(userEmail);
-    expect(res.body.roleCode).toBe('USER');
+    expect(res.body).toHaveProperty('token');
+    expect(typeof res.body.token).toBe('string');
+    expect(res.body.user).toHaveProperty('id');
+    expect(res.body.user.email).toBe(userEmail);
+    expect(res.body.user.roleCode).toBe('USER');
   });
 
   it('returns 401 for wrong password', async () => {
@@ -121,7 +126,7 @@ describe('POST /api/auth/login', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns all permissions in the response', async () => {
+  it('returns all permissions for ADMIN in the response', async () => {
     await request(app).post('/api/auth/register').send({
       email: adminEmail, username: adminUsername, password, roleCode: 'ADMIN',
     });
@@ -129,15 +134,42 @@ describe('POST /api/auth/login', () => {
       email: adminEmail, password,
     });
     expect(res.status).toBe(200);
-    expect(res.body.permissions).toContain('LOG_VIEW');
-    expect(res.body.permissions).toContain('GENERATOR_CONTROL');
+    expect(res.body.user.permissions).toContain('LOG_VIEW');
+    expect(res.body.user.permissions).toContain('GENERATOR_CONTROL');
+  });
+
+  it('token authenticates subsequent requests via Authorization header', async () => {
+    const loginRes = await request(app).post('/api/auth/login').send({
+      email: userEmail, password,
+    });
+    const token = loginRes.body.token;
+    expect(typeof token).toBe('string');
+
+    // Use the JWT token to access /api/auth/me
+    const meRes = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`);
+    expect(meRes.status).toBe(200);
+    expect(meRes.body.email).toBe(userEmail);
+  });
+
+  it('POST /api/auth/logout returns 204', async () => {
+    const loginRes = await request(app).post('/api/auth/login').send({
+      email: userEmail, password,
+    });
+    const token = loginRes.body.token;
+    const res = await request(app)
+      .post('/api/auth/logout')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(204);
   });
 });
 
 // --------------------------------------------------------------------------
-// Role-based access control — items with USER vs ADMIN
+// Role-based access control — items with USER vs ADMIN via JWT
 // --------------------------------------------------------------------------
-describe('Role-based permissions on /api/items', () => {
+describe('Role-based permissions on /api/items (JWT)', () => {
+  let adminToken: string;
   let adminId: string;
   let userId: string;
 
@@ -145,12 +177,13 @@ describe('Role-based permissions on /api/items', () => {
     const adminRes = await request(app).post('/api/auth/register').send({
       email: adminEmail, username: adminUsername, password, roleCode: 'ADMIN',
     });
-    adminId = adminRes.body.id;
+    adminToken = adminRes.body.token;
+    adminId    = adminRes.body.user.id;
 
     const userRes = await request(app).post('/api/auth/register').send({
       email: userEmail, username, password, roleCode: 'USER',
     });
-    userId = userRes.body.id;
+    userId = userRes.body.user.id;
   });
 
   it('USER can read items', async () => {
@@ -163,19 +196,17 @@ describe('Role-based permissions on /api/items', () => {
     expect(res.status).toBe(403);
   });
 
-  it('ADMIN can delete items', async () => {
+  it('ADMIN can delete items via JWT', async () => {
     await prisma.review.deleteMany({ where: { itemId: '1' } });
-    const res = await request(app).delete('/api/items/1').set('x-user-id', adminId);
-    // Either 204 (deleted) or 404 (already gone) — both valid depending on item store state
+    const res = await request(app)
+      .delete('/api/items/1')
+      .set('Authorization', `Bearer ${adminToken}`);
     expect([204, 404]).toContain(res.status);
   });
 
   it('unauthenticated request is guarded by requireAuth middleware', async () => {
-    // In test mode requireAuth injects an admin — so the route succeeds without
-    // x-user-id header. We verify that the DELETE route is actually wired to
-    // requireAuth (not 404) meaning production would return 401.
     const res = await request(app).delete('/api/items/1');
-    // 204 = deleted (test-admin injected), 404 = item gone — both mean the guard is active
+    // In test mode, requireAuth injects a test admin, so 204/404 are expected
     expect([204, 404, 401]).toContain(res.status);
   });
 });

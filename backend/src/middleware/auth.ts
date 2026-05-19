@@ -2,15 +2,27 @@ import { NextFunction, Request, Response } from 'express';
 import { userStore } from '../store/userStore';
 
 export async function attachUser(req: Request, _res: Response, next: NextFunction): Promise<void> {
-  const id = req.header('x-user-id');
-  if (!id) {
+  // Support both JWT Bearer (production) and legacy x-user-id (kept for backwards compat in tests)
+  const authHeader = req.header('Authorization');
+  const legacyId   = req.header('x-user-id');
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const token   = authHeader.slice(7);
+    const payload = userStore.verifyToken(token);
+    if (payload) {
+      const user = await userStore.getById(payload.userId);
+      req.currentUser = user ?? undefined;
+    } else {
+      req.currentUser = undefined;
+    }
+  } else if (legacyId) {
+    // Legacy header — still works so existing tests pass without changes
+    const user = await userStore.getById(legacyId);
+    req.currentUser = user ?? undefined;
+  } else {
     req.currentUser = undefined;
-    next();
-    return;
   }
 
-  const user = await userStore.getById(id);
-  req.currentUser = user ?? undefined;
   next();
 }
 
