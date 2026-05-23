@@ -22,7 +22,10 @@ interface AppContextType {
   isAuthenticated: boolean;
   isOnline: boolean;
   activities: Activity[];
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; mfaRequired?: boolean; tempToken?: string }>;
+  verifyMfaLogin: (tempToken: string, code: string) => Promise<boolean>;
+  forgotPassword: (email: string) => Promise<{ success: boolean; message: string }>;
+  resetPassword: (token: string, password: string) => Promise<{ success: boolean; message: string }>;
   register: (email: string, username: string, password: string) => Promise<boolean>;
   logout: () => void;
   addItem: (item: Omit<ClothingItem, 'id'>) => Promise<void>;
@@ -311,18 +314,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // ─── Public auth actions ──────────────────────────────────────────────────
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; mfaRequired?: boolean; tempToken?: string }> => {
     try {
-      const { token, user: userData } = await apiClient.login({ email, password });
+      const res = await apiClient.login({ email, password });
+      if ('mfaRequired' in res) {
+        return { success: true, mfaRequired: true, tempToken: res.tempToken };
+      }
+      const { token, user: userData } = res;
       apiClient.setToken(token);
       localStorage.setItem(STORAGE_KEYS.TOKEN, token);
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
-      setUser(userData);
+      setUser(userData as User);
       logActivity('login', `${userData.username} logged in`);
+      return { success: true };
+    } catch {
+      return { success: false };
+    }
+  };
+
+  const verifyMfaLogin = async (tempToken: string, code: string): Promise<boolean> => {
+    try {
+      const { token, user: userData } = await apiClient.verifyMfa(tempToken, code);
+      apiClient.setToken(token);
+      localStorage.setItem(STORAGE_KEYS.TOKEN, token);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
+      setUser(userData as User);
+      logActivity('login', `${userData.username} logged in (MFA)`);
       return true;
     } catch {
       return false;
+    }
+  };
+
+  const forgotPassword = async (email: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await apiClient.forgotPassword(email);
+      return { success: true, message: res.message };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Request failed' };
+    }
+  };
+
+  const resetPassword = async (token: string, password: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await apiClient.resetPassword({ token, password });
+      return { success: res.success, message: res.message };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Reset failed' };
     }
   };
 
@@ -421,7 +459,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={{
       items, user, isAuthenticated: !!user, isOnline, activities,
-      login, register, logout,
+      login, verifyMfaLogin, forgotPassword, resetPassword, register, logout,
       addItem, updateItem, deleteItem, getItem,
     }}>
       {children}

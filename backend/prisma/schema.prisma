@@ -48,6 +48,10 @@ model User {
   password      String
   roleId        String
   role          Role            @relation(fields: [roleId], references: [id])
+  totpSecret    String?
+  totpEnabled   Boolean         @default(false)
+  resetToken    String?
+  resetExpires  DateTime?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   activityLogs  ActivityLog[]

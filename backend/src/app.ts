@@ -11,8 +11,13 @@ import chatRouter from './routes/chat';
 import { schema } from './graphql/schema';
 import { resolvers } from './graphql/resolvers';
 import { attachUser } from './middleware/auth';
+import { createRateLimiter } from './middleware/rateLimiter';
+import { securityHeaders } from './middleware/securityHeaders';
 
 const app = express();
+
+// Apply security headers first (HSTS, CSP, X-Frame-Options, etc.)
+app.use(securityHeaders);
 
 // Allow cross-origin requests from any origin (required for LAN cross-machine access).
 // In production, restrict this to specific origins.
@@ -27,13 +32,31 @@ app.options('*', cors());  // pre-flight for all routes
 app.use(express.json());
 app.use(attachUser);
 
-app.use('/api/auth', authRouter);
-app.use('/api/items', itemsRouter);
+// General rate limiter for all API endpoints (max 100 requests/min)
+const generalLimiter = createRateLimiter({
+  windowMs: 60_000,
+  max: 100,
+  message: 'Too many requests from this IP. Please try again in a minute.',
+});
+app.use('/api', generalLimiter);
+
+// Strict rate limiter for sensitive authentication endpoints (max 20 attempts/min)
+const authLimiter = createRateLimiter({
+  windowMs: 60_000,
+  max: 20,
+  message: 'Too many authentication attempts. Please try again in a minute.',
+});
+app.use('/api/auth/login',          authLimiter);
+app.use('/api/auth/register',       authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+
+app.use('/api/auth',              authRouter);
+app.use('/api/items',             itemsRouter);
 app.use('/api/items/:itemId/reviews', reviewsRouter);
-app.use('/api/stats', statsRouter);
-app.use('/api/generator', generatorRouter);
-app.use('/api/admin', adminRouter);
-app.use('/api/chat', chatRouter);
+app.use('/api/stats',             statsRouter);
+app.use('/api/generator',         generatorRouter);
+app.use('/api/admin',             adminRouter);
+app.use('/api/chat',              chatRouter);
 
 app.use('/graphql', createHandler({ schema, rootValue: resolvers }));
 

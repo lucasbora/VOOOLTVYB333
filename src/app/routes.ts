@@ -15,6 +15,11 @@ export const router = createBrowserRouter([
     Component: AuthPage,
   },
   {
+    // Password reset link from email — AuthPage reads ?token= and shows the reset form
+    path: '/reset-password',
+    Component: AuthPage,
+  },
+  {
     path: '/',
     Component: Root,
     children: [

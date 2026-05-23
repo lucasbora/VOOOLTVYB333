@@ -108,9 +108,57 @@ export const apiClient = {
     });
   },
 
-  /** Returns { token, user } */
-  login(data: { email: string; password: string }): Promise<AuthResponse> {
-    return request<AuthResponse>(`${BASE}/auth/login`, {
+  /** Returns { token, user } or { mfaRequired: true, tempToken } */
+  login(data: { email: string; password: string }): Promise<LoginResponse> {
+    return request<LoginResponse>(`${BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  getMfaStatus(): Promise<{ totpEnabled: boolean }> {
+    return request<{ totpEnabled: boolean }>(`${BASE}/auth/mfa/status`);
+  },
+
+  setupMfa(): Promise<{ secret: string; otpauthUrl: string }> {
+    return request<{ secret: string; otpauthUrl: string }>(`${BASE}/auth/mfa/setup`, { method: 'POST' });
+  },
+
+  enableMfa(code: string): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`${BASE}/auth/mfa/enable`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+  },
+
+  disableMfa(code: string): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`${BASE}/auth/mfa/disable`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+  },
+
+  verifyMfa(tempToken: string, code: string): Promise<AuthResponse> {
+    return request<AuthResponse>(`${BASE}/auth/mfa/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tempToken, code }),
+    });
+  },
+
+  forgotPassword(email: string): Promise<{ message: string }> {
+    return request<{ message: string }>(`${BASE}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  resetPassword(data: { token: string; password: string }): Promise<{ success: boolean; message: string }> {
+    return request<{ success: boolean; message: string }>(`${BASE}/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -166,6 +214,8 @@ export interface AuthResponse {
   token: string;
   user: SessionUser;
 }
+
+export type LoginResponse = AuthResponse | { mfaRequired: true; tempToken: string };
 
 export interface Review {
   id: string;

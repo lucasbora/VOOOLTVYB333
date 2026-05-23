@@ -13,7 +13,11 @@ vi.mock('../app/api/apiClient', () => {
     apiClient: {
       setToken: vi.fn(),
       logout: vi.fn(async () => {}),
-      getItems: vi.fn(async () => ({ data: [], totalPages: 1 })),
+      getItems: vi.fn(async () => {
+        // Return the initial items so loadFromServer doesn't wipe the list
+        const { initialItems } = await import('../app/data/items');
+        return { data: initialItems, totalPages: 1 };
+      }),
       getGeneratorStatus: vi.fn(async () => {}),
       login: vi.fn(async ({ email, password }) => {
         const u = users.get(email);
@@ -33,6 +37,7 @@ vi.mock('../app/api/apiClient', () => {
     }
   };
 });
+
 
 // ─── localStorage mock ────────────────────────────────────────────────────────
 const createStoreMock = () => {
@@ -314,22 +319,22 @@ describe('AppContext', () => {
   describe('login', () => {
     it('authenticates with built-in demo credentials', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
-      let ok: boolean | undefined;
+      let res: { success: boolean } | undefined;
 
-      await act(async () => { ok = await result.current.login('demo@voltvybe.com', 'demo1234'); });
+      await act(async () => { res = await result.current.login('demo@voltvybe.com', 'demo1234'); });
 
-      expect(ok).toBe(true);
+      expect(res?.success).toBe(true);
       expect(result.current.isAuthenticated).toBe(true);
       expect(result.current.user?.email).toBe('demo@voltvybe.com');
     });
 
     it('returns false and stays unauthenticated for wrong credentials', async () => {
       const { result } = renderHook(() => useApp(), { wrapper });
-      let ok: boolean | undefined;
+      let res: { success: boolean } | undefined;
 
-      await act(async () => { ok = await result.current.login('wrong@email.com', 'wrongpass'); });
+      await act(async () => { res = await result.current.login('wrong@email.com', 'wrongpass'); });
 
-      expect(ok).toBe(false);
+      expect(res?.success).toBe(false);
       expect(result.current.isAuthenticated).toBe(false);
     });
 
@@ -339,10 +344,10 @@ describe('AppContext', () => {
       await act(async () => { await result.current.register('reg@login.com', 'REGUSER', 'mypassword1'); });
       act(() => { result.current.logout(); });
 
-      let ok: boolean | undefined;
-      await act(async () => { ok = await result.current.login('reg@login.com', 'mypassword1'); });
+      let res: { success: boolean } | undefined;
+      await act(async () => { res = await result.current.login('reg@login.com', 'mypassword1'); });
 
-      expect(ok).toBe(true);
+      expect(res?.success).toBe(true);
       expect(result.current.user?.username).toBe('REGUSER');
     });
 
@@ -352,10 +357,10 @@ describe('AppContext', () => {
       await act(async () => { await result.current.register('pass@check.com', 'PASSUSER', 'correctpass'); });
       act(() => { result.current.logout(); });
 
-      let ok: boolean | undefined;
-      await act(async () => { ok = await result.current.login('pass@check.com', 'wrongpass'); });
+      let res: { success: boolean } | undefined;
+      await act(async () => { res = await result.current.login('pass@check.com', 'wrongpass'); });
 
-      expect(ok).toBe(false);
+      expect(res?.success).toBe(false);
     });
 
     it('sets isAuthenticated to true after successful login', async () => {

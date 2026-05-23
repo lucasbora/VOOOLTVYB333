@@ -9,6 +9,7 @@ declare module 'express-serve-static-core' {
       roleCode: string;
       permissions: string[];
     };
+    isTempToken?: boolean;
   }
 }
 
