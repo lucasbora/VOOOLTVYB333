@@ -6,6 +6,7 @@ import { initSession, trackPageVisit } from '../utils/cookieTracker';
 import {
   Home, LayoutGrid, BarChart3, Zap, LogOut, Menu, X, MessageCircle, Shield
 } from 'lucide-react';
+import { MfaSettingsModal } from '../components/MfaSettingsModal';
 
 const navItems = [
   { path: '/home', label: 'HOME', icon: Home },
@@ -20,6 +21,7 @@ export function Root() {
   const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mfaOpen, setMfaOpen] = useState(false);
 
   React.useEffect(() => {
     if (!isAuthenticated) {
@@ -62,7 +64,7 @@ export function Root() {
               return (
                 <Link key={path} to={path}>
                   <motion.div
-                    whileHover={{ x: 4 }}
+                     whileHover={{ x: 4 }}
                     className="flex items-center gap-3 px-4 py-3 rounded cursor-pointer transition-colors"
                     style={{
                       background: active ? 'rgba(255,229,0,0.12)' : 'transparent',
@@ -120,14 +122,22 @@ export function Root() {
               }}>
                 {user?.username?.[0]?.toUpperCase()}
               </div>
-              <div>
-                <div style={{ color: '#FFFFFF', fontSize: '12px', fontWeight: 600 }}>{user?.username}</div>
-                <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '10px' }}>{user?.email}</div>
+              <div className="flex-1 min-w-0">
+                <div style={{ color: '#FFFFFF', fontSize: '12px', fontWeight: 600 }} className="truncate">{user?.username}</div>
+                <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '10px' }} className="truncate">{user?.email}</div>
               </div>
             </div>
+            
+            <button onClick={() => setMfaOpen(true)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-yellow-400/10 transition-colors mb-2 cursor-pointer"
+              style={{ color: '#FFE500', fontSize: '11px', letterSpacing: '0.1em', border: '1px solid rgba(255,229,0,0.2)', fontFamily: "'Orbitron', sans-serif", fontWeight: 700 }}>
+              <Shield size={14} />
+              MFA SETTINGS
+            </button>
+
             <button onClick={handleLogout}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-red-500/10 transition-colors"
-              style={{ color: 'rgba(255,100,100,0.7)', fontSize: '11px', letterSpacing: '0.1em' }}>
+              className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-red-500/10 transition-colors cursor-pointer"
+              style={{ color: 'rgba(255,100,100,0.7)', fontSize: '11px', letterSpacing: '0.1em', fontFamily: "'Orbitron', sans-serif", fontWeight: 700 }}>
               <LogOut size={14} />
               LOGOUT
             </button>
@@ -151,7 +161,7 @@ export function Root() {
       {menuOpen && (
         <motion.div
           initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-          className="lg:hidden fixed top-14 left-0 right-0 z-40 p-4 space-y-2"
+          className="lg:hidden fixed top-14 left-0 right-0 z-40 p-4 space-y-2 animate-none"
           style={{ background: '#111111', borderBottom: '1px solid rgba(255,229,0,0.2)' }}
         >
           {navItems.map(({ path, label, icon: Icon }) => (
@@ -172,9 +182,13 @@ export function Root() {
               </div>
             </Link>
           )}
-          <div className="pt-2 border-t border-yellow-400/20">
-            <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2"
-              style={{ color: 'rgba(255,100,100,0.8)', fontSize: '11px' }}>
+          <div className="pt-2 border-t border-yellow-400/20 flex flex-col gap-2">
+            <button onClick={() => { setMenuOpen(false); setMfaOpen(true); }} className="flex items-center gap-2 px-4 py-2 w-full text-left"
+              style={{ color: '#FFE500', fontSize: '11px', border: '1px solid rgba(255,229,0,0.2)', borderRadius: '4px', fontFamily: "'Orbitron', sans-serif", fontWeight: 700 }}>
+              <Shield size={14} /> MFA SETTINGS
+            </button>
+            <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 w-full text-left"
+              style={{ color: 'rgba(255,100,100,0.8)', fontSize: '11px', fontFamily: "'Orbitron', sans-serif", fontWeight: 700 }}>
               <LogOut size={14} /> LOGOUT
             </button>
           </div>
@@ -200,6 +214,9 @@ export function Root() {
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* MFA Modal */}
+      <MfaSettingsModal isOpen={mfaOpen} onClose={() => setMfaOpen(false)} />
     </div>
   );
 }
