@@ -24,10 +24,17 @@ export default defineConfig({
   server: {
     // Expose on all network interfaces so LAN machines can reach the dev server
     host: true,
-    https: {
-      key: fs.readFileSync(path.resolve(__dirname, './backend/certs/key.pem')),
-      cert: fs.readFileSync(path.resolve(__dirname, './backend/certs/cert.pem')),
-    },
+    https: (() => {
+      const keyPath = path.resolve(__dirname, './backend/certs/key.pem');
+      const certPath = path.resolve(__dirname, './backend/certs/cert.pem');
+      if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+        return {
+          key: fs.readFileSync(keyPath),
+          cert: fs.readFileSync(certPath),
+        };
+      }
+      return undefined;
+    })(),
     proxy: {
       '/api': {
         target: 'https://localhost:3000',
