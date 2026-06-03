@@ -267,8 +267,8 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
   });
 
   // In a real app, this would send an email. For the lab demo we log it to the console.
-  const proto     = process.env.HTTPS === 'true' ? 'https' : 'http';
-  const resetLink = `${proto}://localhost:5173/reset-password?token=${resetToken}`;
+  const origin    = req.headers.origin || (process.env.HTTPS === 'true' ? 'https://localhost:5173' : 'http://localhost:5173');
+  const resetLink = `${origin}/reset-password?token=${resetToken}`;
 
   console.log('\n================================================================');
   console.log('✉️   PASSWORD RECOVERY LINK (simulated email — copy into browser):');
