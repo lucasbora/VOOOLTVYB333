@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { ClothingItem, initialItems } from '../data/items';
-import { apiClient, SessionUser } from '../api/apiClient';
+import { apiClient, SessionUser, getWsUrl } from '../api/apiClient';
 
 interface User extends SessionUser { }
 
@@ -286,8 +286,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ─── WebSocket — generator live updates ──────────────────────────────────
   useEffect(() => {
     const connect = () => {
-      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const ws = new WebSocket(`${proto}//${window.location.host}/ws`);
+      const ws = new WebSocket(getWsUrl('/ws'));
       wsRef.current = ws;
 
       ws.onmessage = (e) => {

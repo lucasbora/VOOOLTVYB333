@@ -1,6 +1,21 @@
 import { ClothingItem } from '../data/items';
 
-const BASE = '/api';
+const VITE_API_URL = import.meta.env.VITE_API_URL || '';
+const BASE = VITE_API_URL ? `${VITE_API_URL}/api` : '/api';
+
+export function getWsUrl(path: string): string {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) {
+    const wsProto = envUrl.startsWith('https:') ? 'wss:' : 'ws:';
+    const cleanUrl = envUrl.replace(/^https?:\/\//, '');
+    const formattedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${wsProto}//${cleanUrl}${formattedPath}`;
+  } else {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const formattedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${proto}//${window.location.host}${formattedPath}`;
+  }
+}
 
 // ─── Token management ────────────────────────────────────────────────────────
 let authToken: string | null = null;

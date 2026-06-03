@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
-import { apiClient, ChatMessage } from '../api/apiClient';
+import { apiClient, ChatMessage, getWsUrl } from '../api/apiClient';
 import { Send, MessageCircle, Users, Zap, Wifi, WifiOff } from 'lucide-react';
 
 const ROOMS = [
@@ -33,9 +33,8 @@ export function Chat() {
     const connect = () => {
       if (isCancelled) return;
 
-      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const ws = new WebSocket(
-        `${proto}//${window.location.host}/ws/chat?roomId=${encodeURIComponent(roomId)}&userId=${encodeURIComponent(user.id)}`
+        getWsUrl(`/ws/chat?roomId=${encodeURIComponent(roomId)}&userId=${encodeURIComponent(user.id)}`)
       );
       wsRef.current = ws;
 
