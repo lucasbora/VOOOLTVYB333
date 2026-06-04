@@ -17,7 +17,7 @@ export async function seedDatabaseIfNeeded(): Promise<void> {
     const adminRole = await prisma.role.findUnique({ where: { code: 'ADMIN' } });
     const userRole = await prisma.role.findUnique({ where: { code: 'USER' } });
     if (adminRole && userRole) {
-      const demoHash  = await bcrypt.hash('demo1234', SALT_ROUNDS);
+      const demoHash  = await bcrypt.hash('admin4321', SALT_ROUNDS);
       const adminHash = await bcrypt.hash('admin1234', SALT_ROUNDS);
       await prisma.user.upsert({
         where: { email: 'demo@voltvybe.com' },
@@ -57,13 +57,13 @@ export async function seedDatabaseIfNeeded(): Promise<void> {
 
   // ── Permissions ────────────────────────────────────────────────────────────
   const permissionDefs = [
-    { code: 'ITEM_READ',         name: 'Read items' },
-    { code: 'ITEM_CREATE',       name: 'Create items' },
-    { code: 'ITEM_UPDATE',       name: 'Update items' },
-    { code: 'ITEM_DELETE',       name: 'Delete items' },
+    { code: 'ITEM_READ', name: 'Read items' },
+    { code: 'ITEM_CREATE', name: 'Create items' },
+    { code: 'ITEM_UPDATE', name: 'Update items' },
+    { code: 'ITEM_DELETE', name: 'Delete items' },
     { code: 'GENERATOR_CONTROL', name: 'Control fake generator' },
-    { code: 'LOG_VIEW',          name: 'View system logs' },
-    { code: 'CHAT_USE',          name: 'Use realtime chat' },
+    { code: 'LOG_VIEW', name: 'View system logs' },
+    { code: 'CHAT_USE', name: 'Use realtime chat' },
   ];
 
   for (const p of permissionDefs) {
@@ -110,17 +110,17 @@ export async function seedDatabaseIfNeeded(): Promise<void> {
   }
 
   // ── Demo Users ─────────────────────────────────────────────────────────────
-  const demoHash  = await bcrypt.hash('demo1234', SALT_ROUNDS);
+  const demoHash = await bcrypt.hash('admin4321', SALT_ROUNDS);
   const adminHash = await bcrypt.hash('admin1234', SALT_ROUNDS);
 
   await prisma.user.upsert({
     where: { email: 'demo@voltvybe.com' },
     update: {},
     create: {
-      email:    'demo@voltvybe.com',
+      email: 'demo@voltvybe.com',
       username: 'VOLT_DEMO',
       password: demoHash,
-      roleId:   adminRole.id,
+      roleId: adminRole.id,
     },
   });
 
@@ -128,10 +128,10 @@ export async function seedDatabaseIfNeeded(): Promise<void> {
     where: { email: 'admin@voltvybe.com' },
     update: {},
     create: {
-      email:    'admin@voltvybe.com',
+      email: 'admin@voltvybe.com',
       username: 'VOLT_ADMIN',
       password: adminHash,
-      roleId:   adminRole.id,
+      roleId: adminRole.id,
     },
   });
 
@@ -139,10 +139,10 @@ export async function seedDatabaseIfNeeded(): Promise<void> {
     where: { email: 'user@voltvybe.com' },
     update: {},
     create: {
-      email:    'user@voltvybe.com',
+      email: 'user@voltvybe.com',
       username: 'VOLT_USER',
       password: demoHash,
-      roleId:   userRole.id,
+      roleId: userRole.id,
     },
   });
 
@@ -152,22 +152,22 @@ export async function seedDatabaseIfNeeded(): Promise<void> {
       where: { id: item.id },
       update: {},
       create: {
-        id:          item.id,
-        name:        item.name,
-        category:    item.category,
-        price:       item.price,
-        colorHex:    item.colorHex,
-        colorName:   item.colorName,
-        colorGroup:  item.colorGroup,
-        styleTags:   JSON.stringify(item.styleTags),
-        rating:      item.rating,
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        price: item.price,
+        colorHex: item.colorHex,
+        colorName: item.colorName,
+        colorGroup: item.colorGroup,
+        styleTags: JSON.stringify(item.styleTags),
+        rating: item.rating,
         description: item.description,
-        material:    item.material,
-        sizes:       JSON.stringify(item.sizes),
-        inStock:     item.stock > 0,
-        imageUrl:    item.imageUrl,
-        featured:    item.featured,
-        stock:       item.stock,
+        material: item.material,
+        sizes: JSON.stringify(item.sizes),
+        inStock: item.stock > 0,
+        imageUrl: item.imageUrl,
+        featured: item.featured,
+        stock: item.stock,
       },
     });
   }
@@ -177,11 +177,11 @@ export async function seedDatabaseIfNeeded(): Promise<void> {
       where: { id: review.id },
       update: {},
       create: {
-        id:        review.id,
-        itemId:    review.itemId,
-        author:    review.author,
-        rating:    review.rating,
-        comment:   review.comment,
+        id: review.id,
+        itemId: review.itemId,
+        author: review.author,
+        rating: review.rating,
+        comment: review.comment,
         createdAt: new Date(review.createdAt),
       },
     });
@@ -189,7 +189,7 @@ export async function seedDatabaseIfNeeded(): Promise<void> {
 
   console.log('✅  Database seeded successfully.');
   console.log('    Demo accounts:');
-  console.log('      ADMIN  →  demo@voltvybe.com  / demo1234');
+  console.log('      ADMIN  →  demo@voltvybe.com  / admin4321');
   console.log('      ADMIN  →  admin@voltvybe.com / admin1234');
-  console.log('      USER   →  user@voltvybe.com  / demo1234');
+  console.log('      USER   →  user@voltvybe.com  / admin4321');
 }

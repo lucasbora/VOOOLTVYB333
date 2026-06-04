@@ -90,7 +90,7 @@ export function AuthPage() {
           navigate('/home');
         }
       } else {
-        setError('Invalid credentials. Try demo@voltvybe.com / demo1234');
+        setError('Invalid credentials. Try demo@voltvybe.com / admin4321');
       }
     } else {
       if (!username.trim()) { setError('Username is required.'); return; }
@@ -384,7 +384,7 @@ export function AuthPage() {
 
                   {mode === 'login' && (
                     <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', textAlign: 'center' }}>
-                      Demo: demo@voltvybe.com / demo1234
+                      Demo: demo@voltvybe.com / admin4321
                     </p>
                   )}
                 </>
