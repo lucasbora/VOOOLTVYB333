@@ -13,7 +13,43 @@ const SALT_ROUNDS = 12;
 export async function seedDatabaseIfNeeded(): Promise<void> {
   const roleCount = await prisma.role.count();
   if (roleCount > 0) {
-    // DB already seeded — nothing to do
+    // DB already seeded — but let's ensure the demo users have the correct default passwords
+    const adminRole = await prisma.role.findUnique({ where: { code: 'ADMIN' } });
+    const userRole = await prisma.role.findUnique({ where: { code: 'USER' } });
+    if (adminRole && userRole) {
+      const demoHash  = await bcrypt.hash('demo1234', SALT_ROUNDS);
+      const adminHash = await bcrypt.hash('admin1234', SALT_ROUNDS);
+      await prisma.user.upsert({
+        where: { email: 'demo@voltvybe.com' },
+        update: { password: demoHash },
+        create: {
+          email:    'demo@voltvybe.com',
+          username: 'VOLT_DEMO',
+          password: demoHash,
+          roleId:   adminRole.id,
+        },
+      });
+      await prisma.user.upsert({
+        where: { email: 'admin@voltvybe.com' },
+        update: { password: adminHash },
+        create: {
+          email:    'admin@voltvybe.com',
+          username: 'VOLT_ADMIN',
+          password: adminHash,
+          roleId:   adminRole.id,
+        },
+      });
+      await prisma.user.upsert({
+        where: { email: 'user@voltvybe.com' },
+        update: { password: demoHash },
+        create: {
+          email:    'user@voltvybe.com',
+          username: 'VOLT_USER',
+          password: demoHash,
+          roleId:   userRole.id,
+        },
+      });
+    }
     return;
   }
 
