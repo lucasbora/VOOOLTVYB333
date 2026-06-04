@@ -17,7 +17,7 @@ export async function seedDatabaseIfNeeded(): Promise<void> {
     const adminRole = await prisma.role.findUnique({ where: { code: 'ADMIN' } });
     const userRole = await prisma.role.findUnique({ where: { code: 'USER' } });
     if (adminRole && userRole) {
-      const demoHash  = await bcrypt.hash('admin4321', SALT_ROUNDS);
+      const demoHash  = await bcrypt.hash('demo4321', SALT_ROUNDS);
       const adminHash = await bcrypt.hash('admin1234', SALT_ROUNDS);
       await prisma.user.upsert({
         where: { email: 'demo@voltvybe.com' },
@@ -110,7 +110,7 @@ export async function seedDatabaseIfNeeded(): Promise<void> {
   }
 
   // ── Demo Users ─────────────────────────────────────────────────────────────
-  const demoHash = await bcrypt.hash('admin4321', SALT_ROUNDS);
+  const demoHash = await bcrypt.hash('demo4321', SALT_ROUNDS);
   const adminHash = await bcrypt.hash('admin1234', SALT_ROUNDS);
 
   await prisma.user.upsert({
@@ -189,7 +189,7 @@ export async function seedDatabaseIfNeeded(): Promise<void> {
 
   console.log('✅  Database seeded successfully.');
   console.log('    Demo accounts:');
-  console.log('      ADMIN  →  demo@voltvybe.com  / admin4321');
+  console.log('      ADMIN  →  demo@voltvybe.com  / demo4321');
   console.log('      ADMIN  →  admin@voltvybe.com / admin1234');
-  console.log('      USER   →  user@voltvybe.com  / admin4321');
+  console.log('      USER   →  user@voltvybe.com  / demo4321');
 }

@@ -86,7 +86,7 @@ async function main() {
     data: {
       email: 'demo@voltvybe.com',
       username: 'VOLT_DEMO',
-      password: 'admin4321',
+      password: 'demo4321',
       roleId: adminRole.id,
     },
   });
@@ -95,7 +95,7 @@ async function main() {
     data: {
       email: 'user@voltvybe.com',
       username: 'VOLT_USER',
-      password: 'admin4321',
+      password: 'demo4321',
       roleId: userRole.id,
     },
   });
